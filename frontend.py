@@ -11,70 +11,73 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.align import Align
 
+from models import UIModel
+
 
 term = Terminal()
 console = Console()
 answer_prefix_enabled = True
 
 
-@dataclass
-class UIModel:
-    question: str
-    score: str
-    answer_prefix: str = ""
-    answer: str = ""
-
-
 def render(m: UIModel) -> Layout:
-    t = Text(m.answer_prefix + m.answer)
-
+    a1_color = "cyan" if m.selected_answer == 1 else "bright_black"
+    a2_color = "cyan" if m.selected_answer == 2 else "bright_black"
     layout = Layout()
-
-    # splitting base horiztonally -
     layout.split(
         Layout(name="upper", size=3),
         Layout(Panel(m.question, title="Question", border_style="magenta")),
     )
-    # spliting top |
+    answers = Layout(name="answers")
     layout["upper"].split_row(
-        Layout(Panel(t, title="Answer", border_style="cyan")),
+        answers,
         Layout(Panel(Align.center(m.score), title="Score", border_style="magenta"), size=10),
     )
+    if m.num_of_questions == 2:
+        answers.split_row(
+            Layout(Panel(m.answer1, title=m.answer1_context or "Answer", border_style=a1_color), ratio=1),
+            Layout(Panel(m.answer2, title=m.answer2_context or "Answer", border_style=a2_color), ratio=1),
+        )
+    else:
+        answers.update(Panel(m.answer1, title=m.answer1_context or "Answer", border_style=a1_color))
     return layout
 
 
-def prompt_answer(question: str, answer_prefix: str, score: str, initial: str = "") -> str | None:
-    m = UIModel(question=question, score=score, answer=initial, answer_prefix=answer_prefix)  # initilize the UI model
-
-    with term.cbreak(), Live(render(m), console=console, screen=True, refresh_per_second=30) as live:
-        while True:
-            k = term.inkey(timeout=0)
-            if not k:
-                sleep(0.01)
-                continue
-
-            if k.name == "KEY_ENTER":
-                return m.answer_prefix + m.answer
-            elif k.name == "KEY_BACKSPACE":
-                m.answer = m.answer[:-1]
-            elif k.name == "KEY_ESCAPE":
-                m.answer = ""
-                break
-            elif not k.is_sequence:
-                m.answer += str(k)
-
-            live.update(render(m))
-
-
-if __name__ == "__main__":
+def prompt_answer(m: UIModel, live: Live) -> tuple[str, str | None] | None:
+    live.update(render(m))
     while True:
-        QUESTION = "What the broadcast address of the network 192.168.4.4/24"
-        SCORE = "1/4"
-        if answer_prefix_enabled:
-            ANSWER_PREFIX = "192.168.4."
-        else:
-            ANSWER_PREFIX = ""
+        k = term.inkey(timeout=0)
+        if not k:
+            sleep(0.01)
+            continue
 
-        ans = prompt_answer(QUESTION, ANSWER_PREFIX, SCORE)
-        console.print(Panel(f"You typed: [bold]{ans or ''}[/bold]", title="Result", title_align="left"))
-        sleep(2)
+        if k.name == "KEY_ENTER":
+            if m.num_of_questions == 2:
+                if m.selected_answer == 1 and m.answer1 and not m.answer2:
+                    m.selected_answer = 2
+                    live.update(render(m))
+                    continue
+                if m.answer1 and m.answer2:
+                    return (m.answer1, m.answer2)
+                continue
+            else:
+                return (m.answer1, None)
+
+        elif k.name == "KEY_TAB":
+            m.selected_answer = 2 if m.selected_answer == 1 else 1
+
+        elif k.name == "KEY_BACKSPACE":
+            if m.selected_answer == 1:
+                m.answer1 = m.answer1[:-1]
+            else:
+                m.answer2 = m.answer2[:-1]
+
+        elif k.name == "KEY_ESCAPE":
+            return None
+
+        elif not k.is_sequence:
+            if m.selected_answer == 1:
+                m.answer1 += str(k)
+            else:
+                m.answer2 += str(k)
+
+        live.update(render(m))

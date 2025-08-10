@@ -1,10 +1,12 @@
 # stdlib
 from dataclasses import dataclass
 from time import sleep
+import re
 
 # third-party
 from blessed import Terminal
 from rich.console import Console
+from rich.text import Text
 from rich.live import Live
 from rich.layout import Layout
 from rich.panel import Panel
@@ -18,6 +20,18 @@ term = Terminal()
 console = Console()
 answer_prefix_enabled = True
 
+def digits_coloured(text: str) -> Text:
+    t = Text(text or "")
+    for m in re.finditer(r"\d+", t.plain):
+        t.stylize("bold cyan", m.start(), m.end())
+    return t
+
+
+def format_mmss(total_seconds: int) -> str:
+    total_seconds = max(0, int(total_seconds))
+    m, s = divmod(total_seconds, 60)
+    return f"{m:02}:{s:02}"
+
 
 def render(m: UIModel) -> Layout:
     a1_color = "cyan" if m.selected_answer == 1 else "bright_black"
@@ -25,12 +39,13 @@ def render(m: UIModel) -> Layout:
     layout = Layout()
     layout.split(
         Layout(name="upper", size=3),
-        Layout(Panel(m.question, title="Question", border_style="magenta")),
+        Layout(Panel(digits_coloured(m.question), title="Question", border_style="magenta")),
     )
     answers = Layout(name="answers")
     layout["upper"].split_row(
         answers,
         Layout(Panel(Align.center(m.score), title="Score", border_style="magenta"), size=10),
+        Layout(Panel(Align.center(f"Time: {format_mmss(m.timer)}"),title="Timer", border_style="magenta"), size=16),
     )
     if m.num_of_questions == 2:
         answers.split_row(

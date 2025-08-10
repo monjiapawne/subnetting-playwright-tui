@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class UIModel:
+    timer: float
     question: str = ""
     score: str = ""
     num_of_questions: int = 1

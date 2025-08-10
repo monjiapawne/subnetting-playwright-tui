@@ -3,22 +3,17 @@ import re
 from typing import NamedTuple
 from playwright.async_api import async_playwright, Page, Browser
 from playwright_stealth import Stealth
-from frontend import prompt_answer, render, UIModel, console
+from models import UIModel
+from frontend import prompt_answer, render, term, console
 from rich.live import Live
 from rich.panel import Panel
 from time import sleep
-from frontend import term, console, UIModel, prompt_answer
 
 
 class AnswerInfo(NamedTuple):
     num_of_questions: int
     answer1_context: str | None
     answer2_context: str | None
-
-
-# Colors
-CYAN = "\033[1;36m"
-RESET = "\033[0;37m"
 
 
 class AsyncWebScraper:
@@ -35,11 +30,6 @@ class AsyncWebScraper:
         await Stealth().apply_stealth_async(self.context)
         self.page = await self.context.new_page()
         await self.page.goto(url)
-
-    # Helper functions
-    @staticmethod
-    def color_digits(s: str) -> str:
-        return re.sub(r"(\d+)", f"{CYAN}\\1{RESET}", s)
 
     async def get_score(self):
         return await self.page.inner_text("#MainContent_lblRunningTotal")
@@ -75,13 +65,20 @@ class AsyncWebScraper:
     async def close_browser(self):
         await self.browser.close()
 
+async def countdown(m: UIModel, live: Live, seconds: int):
+    m.timer = seconds
+    while m.timer > 0:
+        await asyncio.sleep(1)
+        m.timer -= 1
+        live.update(render(m))
+
 
 async def main():
     s = AsyncWebScraper()
     await s.setup("https://www.subnetting.net/Subnetting.aspx")
 
-    # prepare a reusable ui to be edited, so we can write over top of it and it persists.
     m = UIModel(
+        timer=5 * 60,
         question="",
         score="",
         num_of_questions=1,
@@ -92,32 +89,37 @@ async def main():
         answer2="",
     )
 
-    with term.cbreak(), Live(
-        Panel("Loading..."), console=console, screen=True, refresh_per_second=30
-    ) as live:
-        while True:
-            score = await s.get_score()
-            question = await s.get_question()
-            ai = await s.get_answer()
+    with term.cbreak(), Live(Panel("Loading..."), console=console, screen=True, refresh_per_second=30) as live:
+        timer_task = asyncio.create_task(countdown(m, live, (5 * 60)-1))
+        try:
+            while True:
+                if m.timer <= 0:
+                    break
 
-            # resets input and updates questions
-            m.question = question
-            m.score = score
-            m.num_of_questions = ai.num_of_questions
-            m.selected_answer = 1
-            m.answer1_context = ai.answer1_context or "Answer"
-            m.answer2_context = ai.answer2_context or "Answer"
-            m.answer1 = "10.51.0."
-            m.answer2 = ""
+                m.score = await s.get_score()
+                m.question = await s.get_question()
+                ai = await s.get_answer()
 
-            result = prompt_answer(m, live)
-            answer1, answer2 = result
+                m.num_of_questions = ai.num_of_questions
+                m.selected_answer = 1
+                m.answer1_context = ai.answer1_context or "Answer"
+                m.answer2_context = ai.answer2_context or "Answer"
+                m.answer1 = ""
+                m.answer2 = ""
 
-            await s.set_answer_input(answer1=answer1 or "", answer2=answer2 or "")
-            await s.submit_question()
-            await s.next_question()
+                result = await asyncio.to_thread(prompt_answer, m, live)
+                if not result or m.timer <= 0:
+                    break
+                answer1, answer2 = result
 
-    # await scraper.close_browser()
+                await s.set_answer_input(answer1=answer1 or "", answer2=answer2 or "")
+                await s.submit_question()
+                await s.next_question()
+        finally:
+            if not timer_task.done():
+                timer_task.cancel()
+            await s.close_browser()
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

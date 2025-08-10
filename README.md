@@ -6,3 +6,5 @@ Uses Playwright to scrape questions/answers and Rich + Blessed to render a simpl
 Made to practice subnetting without a browser, just keyboard in the terminal.
 
 Not affiliated with subnetting.net. For personal/educational use only.
+
+![Preview](preview.png)

@@ -1,0 +1,5 @@
+blessed==1.21.0
+pip==23.0.1
+playwright-stealth==2.0.0
+rich==14.1.0
+setuptools==66.1.1

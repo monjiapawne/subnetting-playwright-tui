@@ -1,10 +1,10 @@
-# subnetting-practice-tui
+# subnetting-playwright-tui
 
-A quick test project that wraps the [subnetting.net](https://www.subnetting.net/) subnetting practice game in a terminal UI.  
-Uses Playwright to scrape questions/answers and Rich + Blessed to render a simple TUI with a timer.
-
-Made to practice subnetting without a browser, just keyboard in the terminal.
-
-Not affiliated with subnetting.net. For personal/educational use only.
+A terminal-based subnetting practice tool that wraps the subnetting.net game into a fast, keyboard-driven interface.  
+Built with Playwright for headless scraping and Rich + Blessed for rendering an interactive TUI with a live timer.  
 
 ![Preview](preview.png)
+
+Practice subnetting directly in your terminal!
+
+> ⚙️ Designed for personal and educational use. Not affiliated with subnetting.net.
